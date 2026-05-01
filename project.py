@@ -6,12 +6,12 @@ import random
 
 DEFAULT_FONT= GLUT_BITMAP_HELVETICA_18
 
-camRadius= 500.0
+camRadius= 1000.0
 camAngle= 90.0
-camHeight= 500.0
+camHeight= 1500.0
 fpMode= False
 
-fovY= 120  
+fovY= 122  
 GRID_LENGTH= 600  
 TILE_SIZE= 100
 
@@ -388,90 +388,6 @@ def draw_bullets():
 
 
 
-def drawPlayer():
-    quad=gluNewQuadric()
-    glPushMatrix()
-
-    glTranslatef(position[0],position[1],0)
-
-    if cheatMode:
-        current_rot = gunAngle
-    else:
-        current_rot = playerAngle
-
-    glRotatef(current_rot-90,0,0,1)
-
-    glScalef(PLAYER_SCALE*1.6,PLAYER_SCALE*1.6,PLAYER_SCALE*1.6)
-    if gameOver:
-        glTranslatef(0,80,50)
-        glRotatef(90,1,0,0)
-    glRotatef(90,1,0,0)
-
-    # head
-    glColor3f(0.0,0.0,0.0)
-    glPushMatrix()
-    glTranslatef(0,215,0)
-    gluSphere(quad,35,20,20)
-    glPopMatrix()
-
-    # neck
-    glColor3f(0.9,0.7,0.6)
-    glPushMatrix()
-    glTranslatef(0,160,0)
-    glRotatef(-90,1,0,0)
-    gluCylinder(quad,8,8,20,12,4)
-    glPopMatrix()
-
-    # body 
-    glColor3f(0.35, 0.45, 0.20)
-    glPushMatrix()
-    glTranslatef(0, 120, 0)
-    glScalef(70, 80, 30)
-    glutSolidCube(1)
-    glPopMatrix()
-
-    # armL
-    glColor3f(0.9,0.7,0.6)
-    glPushMatrix()
-    glTranslatef(-35,120,10)
-    glRotatef(180,0,1,0)
-    gluCylinder(quad,12,9,60,12,4)
-    glPopMatrix()
-
-    # armR
-    glColor3f(0.9,0.7,0.6)
-    glPushMatrix()
-    glTranslatef(35,120,10)
-    glRotatef(180,0,1,0)
-    gluCylinder(quad,12,9,60,12,4)
-    glPopMatrix()
-
-    # legL 
-    glColor3f(0.1, 0.1, 0.8)
-    glPushMatrix()
-    glTranslatef(-20, 0, 0)
-    glRotatef(-90, 1, 0, 0)
-    gluCylinder(quad, 18, 10, 90, 12, 8)
-    glPopMatrix()
-
-    # legR 
-    glColor3f(0.1, 0.1, 0.8)
-    glPushMatrix()
-    glTranslatef(20, 0, 0)
-    glRotatef(-90, 1, 0, 0)
-    gluCylinder(quad, 18, 10, 90, 12, 8)
-    glPopMatrix()
-
-    # gun
-    glColor3f(0.7,0.7,0.7)
-    glPushMatrix()
-    glTranslatef(0,120,-5)
-    glRotatef(180,0,1,0)
-    gluCylinder(quad,10,7,120,16,8)
-    glPopMatrix()
-
-    glPopMatrix()
-
 
 
 def draw_floor():
@@ -709,6 +625,8 @@ def draw_second_floor():
 
     glPopMatrix()
 
+
+
 def draw_floor_connector_walls():
     z_bottom = 0      # ground floor
     z_top = 625       # second floor level
@@ -753,7 +671,672 @@ def draw_floor_connector_walls():
     glVertex3f(x_right, y_front, z_top)
     glEnd()
 
+def draw_second_floor_railings():
+    floor_z = 625
+    floor_y = -2000
+    S_x = 4000   # half width X — match your draw_second_floor
+    S_y = 2000   # half width Y
 
+    post_spacing = 80
+    rail_height = 120
+    pt = 8   # post thickness
+
+    x_start = -S_x / 2
+    x_end   =  S_x / 2
+    y_start = floor_y - S_y / 2
+    y_end   = floor_y + S_y / 2
+    z       = floor_z
+
+    def base_bar_x(y_pos):
+        glColor3f(0.4, 0.4, 0.45)
+        glBegin(GL_QUADS)
+        glVertex3f(x_start, y_pos - pt, z + 8)
+        glVertex3f(x_end,   y_pos - pt, z + 8)
+        glVertex3f(x_end,   y_pos + pt, z + 8)
+        glVertex3f(x_start, y_pos + pt, z + 8)
+        glEnd()
+
+    def top_rail_x(y_pos):
+        glColor3f(0.35, 0.35, 0.40)
+        glBegin(GL_QUADS)
+        # top face
+        glVertex3f(x_start, y_pos - pt - 4, z + rail_height)
+        glVertex3f(x_end,   y_pos - pt - 4, z + rail_height)
+        glVertex3f(x_end,   y_pos + pt + 4, z + rail_height)
+        glVertex3f(x_start, y_pos + pt + 4, z + rail_height)
+        # front face
+        glVertex3f(x_start, y_pos - pt - 4, z + rail_height - 14)
+        glVertex3f(x_end,   y_pos - pt - 4, z + rail_height - 14)
+        glVertex3f(x_end,   y_pos - pt - 4, z + rail_height)
+        glVertex3f(x_start, y_pos - pt - 4, z + rail_height)
+        # back face
+        glVertex3f(x_start, y_pos + pt + 4, z + rail_height - 14)
+        glVertex3f(x_end,   y_pos + pt + 4, z + rail_height - 14)
+        glVertex3f(x_end,   y_pos + pt + 4, z + rail_height)
+        glVertex3f(x_start, y_pos + pt + 4, z + rail_height)
+        glEnd()
+
+    def posts_x(y_pos):
+        num = int((x_end - x_start) / post_spacing)
+        for i in range(num + 1):
+            x = x_start + i * post_spacing
+            glColor3f(0.38, 0.38, 0.43)
+            glBegin(GL_QUADS)
+            glVertex3f(x - pt/2, y_pos - pt, z)
+            glVertex3f(x + pt/2, y_pos - pt, z)
+            glVertex3f(x + pt/2, y_pos - pt, z + rail_height)
+            glVertex3f(x - pt/2, y_pos - pt, z + rail_height)
+
+            glVertex3f(x - pt/2, y_pos + pt, z)
+            glVertex3f(x + pt/2, y_pos + pt, z)
+            glVertex3f(x + pt/2, y_pos + pt, z + rail_height)
+            glVertex3f(x - pt/2, y_pos + pt, z + rail_height)
+
+            glVertex3f(x - pt/2, y_pos - pt, z)
+            glVertex3f(x - pt/2, y_pos + pt, z)
+            glVertex3f(x - pt/2, y_pos + pt, z + rail_height)
+            glVertex3f(x - pt/2, y_pos - pt, z + rail_height)
+
+            glVertex3f(x + pt/2, y_pos - pt, z)
+            glVertex3f(x + pt/2, y_pos + pt, z)
+            glVertex3f(x + pt/2, y_pos + pt, z + rail_height)
+            glVertex3f(x + pt/2, y_pos - pt, z + rail_height)
+            glEnd()
+
+    def base_bar_y(x_pos):
+        glColor3f(0.4, 0.4, 0.45)
+        glBegin(GL_QUADS)
+        glVertex3f(x_pos - pt, y_start, z + 8)
+        glVertex3f(x_pos + pt, y_start, z + 8)
+        glVertex3f(x_pos + pt, y_end,   z + 8)
+        glVertex3f(x_pos - pt, y_end,   z + 8)
+        glEnd()
+
+    def top_rail_y(x_pos):
+        glColor3f(0.35, 0.35, 0.40)
+        glBegin(GL_QUADS)
+        glVertex3f(x_pos - pt - 4, y_start, z + rail_height)
+        glVertex3f(x_pos + pt + 4, y_start, z + rail_height)
+        glVertex3f(x_pos + pt + 4, y_end,   z + rail_height)
+        glVertex3f(x_pos - pt - 4, y_end,   z + rail_height)
+
+        glVertex3f(x_pos - pt - 4, y_start, z + rail_height - 14)
+        glVertex3f(x_pos + pt + 4, y_start, z + rail_height - 14)
+        glVertex3f(x_pos + pt + 4, y_start, z + rail_height)
+        glVertex3f(x_pos - pt - 4, y_start, z + rail_height)
+
+        glVertex3f(x_pos - pt - 4, y_end, z + rail_height - 14)
+        glVertex3f(x_pos + pt + 4, y_end, z + rail_height - 14)
+        glVertex3f(x_pos + pt + 4, y_end, z + rail_height)
+        glVertex3f(x_pos - pt - 4, y_end, z + rail_height)
+        glEnd()
+
+    def posts_y(x_pos):
+        num = int((y_end - y_start) / post_spacing)
+        for i in range(num + 1):
+            y = y_start + i * post_spacing
+            glColor3f(0.38, 0.38, 0.43)
+            glBegin(GL_QUADS)
+            glVertex3f(x_pos - pt, y, z)
+            glVertex3f(x_pos + pt, y, z)
+            glVertex3f(x_pos + pt, y, z + rail_height)
+            glVertex3f(x_pos - pt, y, z + rail_height)
+            glEnd()
+
+    # --- Draw all 4 sides ---
+    base_bar_x(y_start)
+    top_rail_x(y_start)
+    posts_x(y_start)
+
+    # base_bar_x(y_end)
+    # top_rail_x(y_end)
+    # posts_x(y_end)
+
+    base_bar_y(x_start)
+    top_rail_y(x_start)
+    posts_y(x_start)
+
+    base_bar_y(x_end)
+    top_rail_y(x_end)
+    posts_y(x_end)
+
+
+def draw_cross(cx, cy, cz, size, arm_w):
+    """Draw a plus/cross shape using quads on a face"""
+    # Horizontal bar
+    glVertex3f(cx - size, cy + arm_w, cz)
+    glVertex3f(cx + size, cy + arm_w, cz)
+    glVertex3f(cx + size, cy - arm_w, cz)
+    glVertex3f(cx - size, cy - arm_w, cz)
+    # Vertical bar
+    glVertex3f(cx - arm_w, cy + size, cz)
+    glVertex3f(cx + arm_w, cy + size, cz)
+    glVertex3f(cx + arm_w, cy - size, cz)
+    glVertex3f(cx - arm_w, cy - size, cz)
+
+def draw_life_cube(x, y, z, s=40):
+    """White cube with red cross on each face"""
+    
+    # --- White cube body ---
+    glColor3f(1.0, 1.0, 1.0)
+    glBegin(GL_QUADS)
+    # Front
+    glVertex3f(x-s, y-s, z+s); glVertex3f(x+s, y-s, z+s)
+    glVertex3f(x+s, y+s, z+s); glVertex3f(x-s, y+s, z+s)
+    # Back
+    glVertex3f(x-s, y-s, z-s); glVertex3f(x+s, y-s, z-s)
+    glVertex3f(x+s, y+s, z-s); glVertex3f(x-s, y+s, z-s)
+    # Left
+    glVertex3f(x-s, y-s, z-s); glVertex3f(x-s, y-s, z+s)
+    glVertex3f(x-s, y+s, z+s); glVertex3f(x-s, y+s, z-s)
+    # Right
+    glVertex3f(x+s, y-s, z-s); glVertex3f(x+s, y-s, z+s)
+    glVertex3f(x+s, y+s, z+s); glVertex3f(x+s, y+s, z-s)
+    # Top
+    glVertex3f(x-s, y+s, z-s); glVertex3f(x+s, y+s, z-s)
+    glVertex3f(x+s, y+s, z+s); glVertex3f(x-s, y+s, z+s)
+    # Bottom
+    glVertex3f(x-s, y-s, z-s); glVertex3f(x+s, y-s, z-s)
+    glVertex3f(x+s, y-s, z+s); glVertex3f(x-s, y-s, z+s)
+    glEnd()
+
+    # --- Red cross on each face ---
+    glColor3f(0.9, 0.1, 0.1)
+    arm = s * 0.55
+    arm_w = s * 0.18
+    offset = s + 1.0   # slightly in front of face
+
+    glBegin(GL_QUADS)
+    # Front face cross
+    draw_cross(x, y, z + offset, arm, arm_w)
+    # Back face cross
+    draw_cross(x, y, z - offset, arm, arm_w)
+    # Top face cross (on XY plane at top)
+    # horizontal
+    glVertex3f(x - arm,  y + offset, z + arm_w)
+    glVertex3f(x + arm,  y + offset, z + arm_w)
+    glVertex3f(x + arm,  y + offset, z - arm_w)
+    glVertex3f(x - arm,  y + offset, z - arm_w)
+    # vertical
+    glVertex3f(x - arm_w, y + offset, z + arm)
+    glVertex3f(x + arm_w, y + offset, z + arm)
+    glVertex3f(x + arm_w, y + offset, z - arm)
+    glVertex3f(x - arm_w, y + offset, z - arm)
+    glEnd()
+
+
+def draw_bullet(cx, cy, cz, scale=1.0, angle=0):
+    """Simple bullet shape using cylinder + cone approximation"""
+    glPushMatrix()
+    glTranslatef(cx, cy, cz)
+    glRotatef(angle, 0, 0, 1)
+    glScalef(scale, scale, scale)
+
+    quad = gluNewQuadric()
+
+    # Body — dark gold cylinder
+    glColor3f(0.75, 0.60, 0.15)
+    glPushMatrix()
+    glRotatef(90, 0, 1, 0)
+    gluCylinder(quad, 4, 4, 20, 10, 4)
+    glPopMatrix()
+
+    # Tip — pointed cone
+    glColor3f(0.85, 0.70, 0.20)
+    glPushMatrix()
+    glTranslatef(20, 0, 0)
+    glRotatef(90, 0, 1, 0)
+    gluCylinder(quad, 4, 0, 10, 10, 4)
+    glPopMatrix()
+
+    # Base — flat cap
+    glColor3f(0.60, 0.50, 0.10)
+    glPushMatrix()
+    glRotatef(-90, 0, 1, 0)
+    gluDisk(quad, 0, 4, 10, 2)
+    glPopMatrix()
+
+    glPopMatrix()
+
+
+def draw_ammo_cube(x, y, z, s=40):
+    """Dark cube with gold bullet symbols on faces"""
+
+    # --- Dark grey cube body ---
+    glColor3f(0.25, 0.25, 0.28)
+    glBegin(GL_QUADS)
+    # Front
+    glVertex3f(x-s, y-s, z+s); glVertex3f(x+s, y-s, z+s)
+    glVertex3f(x+s, y+s, z+s); glVertex3f(x-s, y+s, z+s)
+    # Back
+    glVertex3f(x-s, y-s, z-s); glVertex3f(x+s, y-s, z-s)
+    glVertex3f(x+s, y+s, z-s); glVertex3f(x-s, y+s, z-s)
+    # Left
+    glVertex3f(x-s, y-s, z-s); glVertex3f(x-s, y-s, z+s)
+    glVertex3f(x-s, y+s, z+s); glVertex3f(x-s, y+s, z-s)
+    # Right
+    glVertex3f(x+s, y-s, z-s); glVertex3f(x+s, y-s, z+s)
+    glVertex3f(x+s, y+s, z+s); glVertex3f(x+s, y+s, z-s)
+    # Top
+    glVertex3f(x-s, y+s, z-s); glVertex3f(x+s, y+s, z-s)
+    glVertex3f(x+s, y+s, z+s); glVertex3f(x-s, y+s, z+s)
+    # Bottom
+    glVertex3f(x-s, y-s, z-s); glVertex3f(x+s, y-s, z-s)
+    glVertex3f(x+s, y-s, z+s); glVertex3f(x-s, y-s, z+s)
+    glEnd()
+
+    # --- Bullets on front and side faces ---
+    offset = s + 2.0
+    draw_bullet(x,        y, z + offset, scale=1.0, angle=0)    # front — horizontal
+    draw_bullet(x - s - 2, y, z,         scale=1.0, angle=45)   # left  — diagonal
+    draw_bullet(x,        y, z - offset, scale=1.0, angle=20)   # back
+
+
+
+
+
+
+
+def draw_normal_zombie(x, y, scale=1.0):
+    """Small, slow zombie - Health 1"""
+    quad = gluNewQuadric()
+    glPushMatrix()
+    glTranslatef(x, y, 0)
+    glScalef(scale * 0.6, scale * 0.6, scale * 0.6)
+    glRotatef(90, 1, 0, 0)
+
+    # body - cuboid (Y spans from 85 to 155)
+    glColor3f(0.55, 0.65, 0.35)
+    glPushMatrix()
+    glTranslatef(0, 120, 0)
+    glScalef(55, 70, 25)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # neck (starts inside body top, extends to 168)
+    glColor3f(0.55, 0.65, 0.35)
+    glPushMatrix()
+    glTranslatef(0, 150, 0) 
+    glRotatef(-90, 1, 0, 0)
+    gluCylinder(quad, 7, 7, 18, 10, 4)
+    glPopMatrix()
+
+    # head (radius 30, base is at 160, overlapping neck perfectly)
+    glColor3f(0.6, 0.75, 0.4)
+    glPushMatrix()
+    glTranslatef(0, 190, 0)
+    gluSphere(quad, 30, 15, 15)
+    glPopMatrix()
+
+    # red eyes
+    glColor3f(1.0, 0.0, 0.0)
+    glPushMatrix()
+    glTranslatef(-10, 195, -28)
+    gluSphere(quad, 6, 8, 8)
+    glPopMatrix()
+    glPushMatrix()
+    glTranslatef(10, 195, -28)
+    gluSphere(quad, 6, 8, 8)
+    glPopMatrix()
+
+    # arm L (anchored to shoulder)
+    glColor3f(0.55, 0.65, 0.35)
+    glPushMatrix()
+    glTranslatef(-32, 145, 0)
+    glRotatef(180, 0, 1, 0)
+    gluCylinder(quad, 9, 7, 55, 10, 4)
+    glPopMatrix()
+
+    # arm R (anchored to shoulder)
+    glColor3f(0.55, 0.65, 0.35)
+    glPushMatrix()
+    glTranslatef(32, 145, 0)
+    glRotatef(180, 0, 1, 0)
+    gluCylinder(quad, 9, 7, 55, 10, 4)
+    glPopMatrix()
+
+    # leg L (anchored to hip, draws downward)
+    glColor3f(0.45, 0.55, 0.28)
+    glPushMatrix()
+    glTranslatef(-16, 85, 0)
+    glRotatef(90, 1, 0, 0)
+    gluCylinder(quad, 14, 8, 80, 10, 6)
+    glPopMatrix()
+
+    # leg R (anchored to hip, draws downward)
+    glColor3f(0.45, 0.55, 0.28)
+    glPushMatrix()
+    glTranslatef(16, 85, 0)
+    glRotatef(90, 1, 0, 0)
+    gluCylinder(quad, 14, 8, 80, 10, 6)
+    glPopMatrix()
+
+    glPopMatrix()
+
+
+def draw_runner_zombie(x, y, scale=1.0):
+    """Medium, fast zombie - Health 2 — leaning forward pose"""
+    quad = gluNewQuadric()
+    glPushMatrix()
+    glTranslatef(x, y, 0)
+    glScalef(scale * 0.85, scale * 0.85, scale * 0.85)
+    glRotatef(90, 1, 0, 0)
+
+    # body — leaning forward 15 degrees
+    glColor3f(0.60, 0.72, 0.35)
+    glPushMatrix()
+    glTranslatef(0, 118, 0)
+    glRotatef(15, 1, 0, 0)
+    glScalef(60, 78, 28)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # neck (shifted +Z and angled forward to align with leaned body)
+    glColor3f(0.60, 0.72, 0.35)
+    glPushMatrix()
+    glTranslatef(0, 152, 8)
+    glRotatef(-75, 1, 0, 0) 
+    gluCylinder(quad, 8, 8, 20, 10, 4)
+    glPopMatrix()
+
+    # head (tilted forward, intersects neck perfectly)
+    glColor3f(0.65, 0.78, 0.38)
+    glPushMatrix()
+    glTranslatef(0, 188, 16)
+    glRotatef(20, 1, 0, 0)
+    gluSphere(quad, 32, 15, 15)
+    glPopMatrix()
+
+    # red eyes
+    glColor3f(1.0, 0.0, 0.0)
+    glPushMatrix()
+    glTranslatef(-11, 192, -14)
+    gluSphere(quad, 7, 8, 8)
+    glPopMatrix()
+    glPushMatrix()
+    glTranslatef(11, 192, -14)
+    gluSphere(quad, 7, 8, 8)
+    glPopMatrix()
+
+    # arm L — raised forward
+    glColor3f(0.60, 0.72, 0.35)
+    glPushMatrix()
+    glTranslatef(-35, 145, 6)
+    glRotatef(140, 1, 0, 0)
+    gluCylinder(quad, 10, 7, 60, 10, 4)
+    glPopMatrix()
+
+    # arm R — pushed back
+    glColor3f(0.60, 0.72, 0.35)
+    glPushMatrix()
+    glTranslatef(35, 145, 6)
+    glRotatef(220, 1, 0, 0)
+    gluCylinder(quad, 10, 7, 60, 10, 4)
+    glPopMatrix()
+
+    # leg L — stride forward (anchored to tilted hip)
+    glColor3f(0.50, 0.62, 0.28)
+    glPushMatrix()
+    glTranslatef(-18, 82, -8)
+    glRotatef(90, 1, 0, 0) # Angled down and forward
+    gluCylinder(quad, 15, 9, 85, 10, 6)
+    glPopMatrix()
+
+    # leg R — stride back (anchored to tilted hip)
+    glColor3f(0.50, 0.62, 0.28)
+    glPushMatrix()
+    glTranslatef(18, 82, -8)
+    glRotatef(90, 1, 0, 0) # Angled down and backward
+    gluCylinder(quad, 15, 9, 85, 10, 6)
+    glPopMatrix()
+
+    glPopMatrix()
+
+
+def draw_brute_zombie(x, y, scale=1.0):
+    """Large, slow zombie - Health 3 — massive build"""
+    quad = gluNewQuadric()
+    glPushMatrix()
+    glTranslatef(x, y, 0)
+    glScalef(scale * 1.4, scale * 1.4, scale * 1.4)
+    glRotatef(90, 1, 0, 0)
+
+    # body — massive wide cuboid (Y spans 65 to 155)
+    glColor3f(0.40, 0.52, 0.22)
+    glPushMatrix()
+    glTranslatef(0, 110, 0)
+    glScalef(100, 90, 45)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # neck — thick, sunken into body
+    glColor3f(0.38, 0.50, 0.20)
+    glPushMatrix()
+    glTranslatef(0, 150, 0)
+    glRotatef(-90, 1, 0, 0)
+    gluCylinder(quad, 15, 15, 25, 12, 4)
+    glPopMatrix()
+
+    # head — large and wide
+    glColor3f(0.40, 0.52, 0.22)
+    glPushMatrix()
+    glTranslatef(0, 195, 0)
+    glScalef(1.3, 1.1, 1.2)
+    gluSphere(quad, 38, 15, 15)
+    glPopMatrix()
+
+    # red eyes — bigger and menacing
+    glColor3f(1.0, 0.0, 0.0)
+    glPushMatrix()
+    glTranslatef(-15, 200, -35)
+    gluSphere(quad, 10, 8, 8)
+    glPopMatrix()
+    glPushMatrix()
+    glTranslatef(15, 200, -35)
+    gluSphere(quad, 10, 8, 8)
+    glPopMatrix()
+
+    # Unified Left Arm (Shoulder + Arm + Fist)
+    glPushMatrix()
+    glTranslatef(-58, 140, 0) # Anchored just outside body width
+    # shoulder sphere
+    glColor3f(0.38, 0.50, 0.20)
+    gluSphere(quad, 22, 12, 12)
+    # arm cylinder
+    glColor3f(0.40, 0.52, 0.22)
+    glRotatef(170, 0, 1, 0)
+    gluCylinder(quad, 20, 14, 80, 12, 4)
+    # fist sphere (translated exactly to the end of the arm cylinder)
+    glColor3f(0.35, 0.45, 0.18)
+    glTranslatef(0, 0, 80)
+    gluSphere(quad, 16, 10, 10)
+    glPopMatrix()
+
+    # Unified Right Arm (Shoulder + Arm + Fist)
+    glPushMatrix()
+    glTranslatef(58, 140, 0)
+    # shoulder sphere
+    glColor3f(0.38, 0.50, 0.20)
+    gluSphere(quad, 22, 12, 12)
+    # arm cylinder
+    glColor3f(0.40, 0.52, 0.22)
+    glRotatef(170, 0, 1, 0)
+    gluCylinder(quad, 20, 14, 80, 12, 4)
+    # fist sphere
+    glColor3f(0.35, 0.45, 0.18)
+    glTranslatef(0, 0, 80)
+    gluSphere(quad, 16, 10, 10)
+    glPopMatrix()
+
+    # leg L — anchored to hip, draws down
+    glColor3f(0.32, 0.42, 0.18)
+    glPushMatrix()
+    glTranslatef(-28, 65, 0)
+    glRotatef(90, 1, 0, 0)
+    gluCylinder(quad, 24, 16, 85, 12, 6)
+    glPopMatrix()
+
+    # leg R — anchored to hip, draws down
+    glColor3f(0.32, 0.42, 0.18)
+    glPushMatrix()
+    glTranslatef(28, 65, 0)
+    glRotatef(90, 1, 0, 0)
+    gluCylinder(quad, 24, 16, 85, 12, 6)
+    glPopMatrix()
+
+    glPopMatrix()
+
+
+def drawPlayer():
+    quad = gluNewQuadric()
+    glPushMatrix()
+
+    glTranslatef(0, 500, 0)        # fixed position
+    glRotatef(90, 1, 0, 0)       # stand upright
+    glScalef(0.8, 0.8, 0.8)      # adjust size
+
+    # --- head ---
+    glColor3f(0.90, 0.72, 0.55)
+    glPushMatrix()
+    glTranslatef(0, 215, 0)
+    gluSphere(quad, 35, 20, 20)
+    glPopMatrix()
+
+    # --- neck ---
+    glColor3f(0.90, 0.72, 0.55)
+    glPushMatrix()
+    glTranslatef(0, 160, 0)
+    glRotatef(-90, 1, 0, 0)
+    gluCylinder(quad, 8, 8, 22, 12, 4)
+    glPopMatrix()
+
+    # --- white undershirt ---
+    glColor3f(0.95, 0.95, 0.95)
+    glPushMatrix()
+    glTranslatef(0, 120, 0)
+    glScalef(72, 82, 28)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # --- brown vest ---
+    glColor3f(0.50, 0.35, 0.18)
+    glPushMatrix()
+    glTranslatef(0, 122, -2)
+    glScalef(68, 75, 26)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # --- vest pocket ---
+    glColor3f(0.45, 0.30, 0.15)
+    glPushMatrix()
+    glTranslatef(-18, 130, -16)
+    glScalef(14, 12, 4)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # --- LEFT ARM ASSEMBLY (Arm, Hand, Gun aligned hierarchically) ---
+    glPushMatrix()
+    
+    # 1. Position at the left shoulder
+    glTranslatef(-35, 138, 0)
+    
+    # 2. Point arm straight forward
+    glRotatef(180, 0, 1, 0)
+    
+    # Draw arm cylinder
+    glColor3f(0.90, 0.72, 0.55)
+    gluCylinder(quad, 12, 9, 70, 12, 4)
+    
+    # 3. Move exactly to the end of the arm (wrist)
+    glTranslatef(0, 0, 70)
+    
+    # Draw left hand glove
+    glColor3f(0.55, 0.38, 0.22)
+    gluSphere(quad, 13, 10, 10)
+    
+    # 4. Position and align the gun inside the hand
+    # Arm is already pointing forward, just shift the gun slightly into the palm
+    glTranslatef(0, 3, 5)
+    
+    # Draw gun barrel
+    glColor3f(0.30, 0.30, 0.30)
+    gluCylinder(quad, 5, 4, 45, 12, 4)
+    
+    # Draw gun grip
+    glColor3f(0.25, 0.18, 0.10)
+    glPushMatrix()
+    glTranslatef(0, -2, 5)  # Align grip to the back of the barrel
+    glRotatef(100, 1, 0, 0) # Angle grip downward
+    gluCylinder(quad, 4, 3, 20, 8, 4)
+    glPopMatrix()
+    
+    glPopMatrix() 
+    # --- END LEFT ARM ASSEMBLY ---
+
+    # --- arm R (pointing forward) ---
+    glColor3f(0.90, 0.72, 0.55)
+    glPushMatrix()
+    glTranslatef(35, 138, 0)
+    glRotatef(180, 0, 1, 0) # Point cylinder straight forward
+    gluCylinder(quad, 12, 9, 70, 12, 4) # Match left arm length of 70
+    glPopMatrix()
+
+    # --- right hand ---
+    glColor3f(0.90, 0.72, 0.55)
+    glPushMatrix()
+    glTranslatef(35, 138, -70) # Move to the end of the forward-pointing arm
+    gluSphere(quad, 11, 10, 10)
+    glPopMatrix()
+
+    # --- pants leg L ---
+    glColor3f(0.42, 0.28, 0.12)
+    glPushMatrix()
+    glTranslatef(-20, 80, 0)
+    glScalef(26, 45, 24)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # --- pants leg R ---
+    glColor3f(0.42, 0.28, 0.12)
+    glPushMatrix()
+    glTranslatef(20, 80, 0)
+    glScalef(26, 45, 24)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    # --- lower leg L ---
+    glColor3f(0.38, 0.24, 0.10)
+    glPushMatrix()
+    glTranslatef(-20, 55, 0)
+    glRotatef(90, 1, 0, 0)
+    gluCylinder(quad, 13, 10, 55, 12, 6)
+    glPopMatrix()
+
+    # --- lower leg R ---
+    glColor3f(0.38, 0.24, 0.10)
+    glPushMatrix()
+    glTranslatef(20, 55, 0)
+    glRotatef(90, 1, 0, 0)
+    gluCylinder(quad, 13, 10, 55, 12, 6)
+    glPopMatrix()
+
+    # --- boot L ---
+    glColor3f(0.28, 0.16, 0.08)
+    glPushMatrix()
+    glTranslatef(-20, 0, 2)
+    glScalef(1.2, 0.6, 1.4)
+    gluSphere(quad, 16, 10, 10)
+    glPopMatrix()
+
+    # --- boot R ---
+    glColor3f(0.28, 0.16, 0.08)
+    glPushMatrix()
+    glTranslatef(20, 0, 2)
+    glScalef(1.2, 0.6, 1.4)
+    gluSphere(quad, 16, 10, 10)
+    glPopMatrix()
+
+    glPopMatrix()
 
 def showScreen():
    
@@ -763,15 +1346,22 @@ def showScreen():
     glViewport(0, 0, 1000, 800)  
 
     setupCamera()  
-
+    drawPlayer()
     draw_floor()
+    draw_normal_zombie(200,  700, 1.0)
+    draw_runner_zombie(0,    700, 1.0)
+    draw_brute_zombie(-200,  700, 1.0)
+    draw_life_cube(500,  100, 40)    # raised up on Z
+    draw_ammo_cube(-500, 100, 40)    # raised up on Z
     draw_escalators()
     draw_floor_connector_walls()
     draw_second_floor()
+    draw_second_floor_railings() 
+    
     #draw_grid()
     #draw_boundaries()
 
-    #drawPlayer()
+   
 
     #for e in enemies:
      #   draw_enemy(e["x"], e["y"], e["scale"])
