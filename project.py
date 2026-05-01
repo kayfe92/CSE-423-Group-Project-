@@ -651,58 +651,56 @@ def draw_escalators():
 
 
 def draw_second_floor():
-    S = 2000
+    S_x = 4000   # <-- control X axis width here
+    S_y = 2000   # Y axis depth
     floor_z = 625
     floor_y = -2000
 
     glPushMatrix()
     glTranslatef(0, floor_y, floor_z)
 
-    TILE = 100
-    cols = int(S / TILE)
-
-    # solid base floor first
-    glColor3f(0.5, 0.5, 0.5)   # dark background color
+    # solid base floor
+    glColor3f(0.5, 0.5, 0.5)
     glBegin(GL_QUADS)
-    glVertex3f(-S/2, -S/2, 0)
-    glVertex3f( S/2, -S/2, 0)
-    glVertex3f( S/2,  S/2, 0)
-    glVertex3f(-S/2,  S/2, 0)
+    glVertex3f(-S_x/2, -S_y/2, 0)
+    glVertex3f( S_x/2, -S_y/2, 0)
+    glVertex3f( S_x/2,  S_y/2, 0)
+    glVertex3f(-S_x/2,  S_y/2, 0)
     glEnd()
 
+    # tiles — use S_x and S_y for col/row counts
+    TILE = 100
+    cols = int(S_x / TILE)
+    rows = int(S_y / TILE)
     border = 6
-    b = 5   # thickness of the border quad
+    b = 5
 
-    for row in range(cols):
+    for row in range(rows):
         for col in range(cols):
-            x0 = -S/2 + col * TILE + border
-            y0 = -S/2 + row * TILE + border
+            x0 = -S_x/2 + col * TILE + border
+            y0 = -S_y/2 + row * TILE + border
             x1 = x0 + TILE - border * 2
             y1 = y0 + TILE - border * 2
 
             glColor3f(0.75, 0.75, 0.75)
             glBegin(GL_QUADS)
 
-            # bottom edge
-            glVertex3f(x0,     y0,     1)
+            glVertex3f(x0,     y0,     1)   # bottom edge
             glVertex3f(x1,     y0,     1)
             glVertex3f(x1,     y0 + b, 1)
             glVertex3f(x0,     y0 + b, 1)
 
-            # top edge
-            glVertex3f(x0,     y1 - b, 1)
+            glVertex3f(x0,     y1 - b, 1)   # top edge
             glVertex3f(x1,     y1 - b, 1)
             glVertex3f(x1,     y1,     1)
             glVertex3f(x0,     y1,     1)
 
-            # left edge
-            glVertex3f(x0,     y0,     1)
+            glVertex3f(x0,     y0,     1)   # left edge
             glVertex3f(x0 + b, y0,     1)
             glVertex3f(x0 + b, y1,     1)
             glVertex3f(x0,     y1,     1)
 
-            # right edge
-            glVertex3f(x1 - b, y0,     1)
+            glVertex3f(x1 - b, y0,     1)   # right edge
             glVertex3f(x1,     y0,     1)
             glVertex3f(x1,     y1,     1)
             glVertex3f(x1 - b, y1,     1)
@@ -710,6 +708,50 @@ def draw_second_floor():
             glEnd()
 
     glPopMatrix()
+
+def draw_floor_connector_walls():
+    z_bottom = 0      # ground floor
+    z_top = 625       # second floor level
+
+    # Shaft boundaries in world space (adjust these to fit)
+    x_left  = -2000
+    x_right =  2000
+    y_front = -2000
+    y_back  =  2000
+
+    # Front wall
+    glColor3f(0.6, 0.6, 0.65)
+    glBegin(GL_QUADS)
+    glVertex3f(x_left,  y_front, z_bottom)
+    glVertex3f(x_right, y_front, z_bottom)
+    glVertex3f(x_right, y_front, z_top)
+    glVertex3f(x_left,  y_front, z_top)
+    glEnd()
+
+    # Back wall
+    glBegin(GL_QUADS)
+    glVertex3f(x_left,  y_back, z_bottom)
+    glVertex3f(x_right, y_back, z_bottom)
+    glVertex3f(x_right, y_back, z_top)
+    glVertex3f(x_left,  y_back, z_top)
+    glEnd()
+
+    # Left wall
+    glColor3f(0.55, 0.55, 0.60)
+    glBegin(GL_QUADS)
+    glVertex3f(x_left, y_front, z_bottom)
+    glVertex3f(x_left, y_back,  z_bottom)
+    glVertex3f(x_left, y_back,  z_top)
+    glVertex3f(x_left, y_front, z_top)
+    glEnd()
+
+    # Right wall
+    glBegin(GL_QUADS)
+    glVertex3f(x_right, y_front, z_bottom)
+    glVertex3f(x_right, y_back,  z_bottom)
+    glVertex3f(x_right, y_back,  z_top)
+    glVertex3f(x_right, y_front, z_top)
+    glEnd()
 
 
 
@@ -724,6 +766,7 @@ def showScreen():
 
     draw_floor()
     draw_escalators()
+    draw_floor_connector_walls()
     draw_second_floor()
     #draw_grid()
     #draw_boundaries()
