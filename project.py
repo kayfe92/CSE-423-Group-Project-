@@ -4,8 +4,8 @@ from OpenGL.GLU import *
 import math
 import random
 
-playerZ = 0.0
-position = [0.0, 0.0]
+playerZ = 625.0
+position = [0.0, -2000.0]
 # player's height
 onEscalator = None  # None, 'up', or 'down'
 ESCALATOR_BOTTOM_Y = 350  # where escalator starts (world space after transform)
@@ -42,7 +42,7 @@ spawnDelay = 180
 ALT_COST = 5
 ALT_RADIUS = 350
 
-speedBullet = 10.0
+speedBullet = 35.0
 
 gunFwd = 265.0 * PLAYER_SCALE
 gunH = 180.0 * PLAYER_SCALE
@@ -50,6 +50,7 @@ gunH = 180.0 * PLAYER_SCALE
 playerAngle = 90.0
 gunAngle = 90.0
 health = 5
+ammo = 30
 score = 0
 missed = 0
 gameOver = False
@@ -59,6 +60,43 @@ lastShot = 0
 
 cheatMode = False
 autoCam = False
+
+# ---- WAVE SYSTEM ----
+currentWaveNum = 1
+MAX_WAVES = 3
+wavePaused = False       # True when between waves waiting for ENTER
+waveCleared = False      # True when a wave is cleared but before advancing
+gameWon = False          # True when all waves cleared
+
+# enemies killed this wave
+enemiesKilledThisWave = 0
+# how many enemies must die to clear a wave
+WAVE_KILL_TARGETS = {1: 10, 2: 20, 3: 30}
+
+# ---- PICKUPS on 2nd floor ----
+# Only 1 pickup at a time; spawns every PICKUP_INTERVAL frames after previous is collected
+# pickup is None when nothing is currently on the floor
+pickup = None
+PICKUP_SPAWN_Z = 625    # 2nd floor height
+PICKUP_RADIUS = 80      # collection radius
+PICKUP_INTERVAL = 180   # frames between spawns (~5 sec at 60fps)
+pickupTimer = 0         # counts up; spawn when it hits PICKUP_INTERVAL
+
+def spawn_single_pickup():
+    """Spawn one random health or ammo pickup on the 2nd floor."""
+    global pickup
+    floor_x_min, floor_x_max = -1800, 1800
+    floor_y_min, floor_y_max = -2900, -1100
+    ptype = random.choice(["health", "ammo"])
+    px = random.uniform(floor_x_min, floor_x_max)
+    py = random.uniform(floor_y_min, floor_y_max)
+    pickup = {"type": ptype, "x": px, "y": py, "active": True}
+
+def spawn_pickups():
+    """Called at game start / wave start -- resets pickup state."""
+    global pickup, pickupTimer
+    pickup = None
+    pickupTimer = 0
 
 
 def draw_text(x, y, text, font=None):
@@ -93,27 +131,14 @@ def enemy_initialize():
         createEnemy()
 
 def getMaxEnemiesForWave():
-    wave = getCurrentWave()
-
-    if wave == 1:
+    if currentWaveNum == 1:
         return 5
-
-    if wave == 2:
+    if currentWaveNum == 2:
         return 10
-
     return 15
 
 def getCurrentWave():
-    # Wave 3 start
-    if score >= 15 or missed >= 4:
-        return 3
-
-    # Wave 2 start
-    if score >= 10 or missed >= 2 or playerZ > 300:
-        return 2
-
-    # Default
-    return 1
+    return currentWaveNum
 
 
 def chooseZombieType():
@@ -125,7 +150,7 @@ def chooseZombieType():
         return {
             "type": "brute",
             "scale": 1.0,
-            "speed": 0.08,
+            "speed": 1.8,
         }
 
     # Wave 2: brute + runner zombies
@@ -134,13 +159,13 @@ def chooseZombieType():
             return {
                 "type": "brute",
                 "scale": 1.0,
-                "speed": 0.08,
+                "speed": 1.8,
             }
         else:
             return {
                 "type": "runner",
                 "scale": 1.0,
-                "speed": 0.16,
+                "speed": 3.2,
             }
 
     # Wave 3: brute + runner + normal zombies
@@ -148,19 +173,19 @@ def chooseZombieType():
         return {
             "type": "brute",
             "scale": 1.0,
-            "speed": 0.08,
+            "speed": 1.8,
         }
     elif r < 0.70:
         return {
             "type": "runner",
             "scale": 1.0,
-            "speed": 0.16,
+            "speed": 3.2,
         }
     else:
         return {
             "type": "normal",
             "scale": 1.0,
-            "speed": 0.28,
+            "speed": 5.5,
         }
 
 
@@ -188,37 +213,27 @@ def createEnemy():
     })
 
 def updateEnemyFloor(enemy):
-    ex, ey = enemy["x"], enemy["y"]
-
-    in_esc_y = ESCALATOR_TOP_Y <= ey <= ESCALATOR_BOTTOM_Y
-
-    on_right = in_esc_y and abs(ex - ESCALATOR_RIGHT_X) < ESCALATOR_LANE_W
-    on_left = in_esc_y and abs(ex - ESCALATOR_LEFT_X) < ESCALATOR_LANE_W
-
-    if on_right:
-        t = (ESCALATOR_BOTTOM_Y - ey) / (ESCALATOR_BOTTOM_Y - ESCALATOR_TOP_Y)
-        t = max(0.0, min(1.0, t))
-        enemy["z"] = ESCALATOR_BOTTOM_Z + t * (ESCALATOR_TOP_Z - ESCALATOR_BOTTOM_Z)
-
-    elif on_left:
-        t = (ESCALATOR_BOTTOM_Y - ey) / (ESCALATOR_BOTTOM_Y - ESCALATOR_TOP_Y)
-        t = max(0.0, min(1.0, t))
-        enemy["z"] = ESCALATOR_TOP_Z - t * (ESCALATOR_TOP_Z - ESCALATOR_BOTTOM_Z)
-
-    else:
-        if enemy["z"] > 300:
-            enemy["z"] = ESCALATOR_TOP_Z
-        else:
-            enemy["z"] = ESCALATOR_BOTTOM_Z
+    # Zombies always stay on floor 1 — never ride escalator to floor 2
+    enemy["z"] = ESCALATOR_BOTTOM_Z
 
 def resetGame():
     global bullets, playerAngle, score, position
-    global cheatMode, health, missed
+    global cheatMode, health, ammo, missed
     global gameOver, autoCam, gunAngle
+    global currentWaveNum, wavePaused, waveCleared, gameWon
+    global enemiesKilledThisWave
 
     health = 5
-    position = [0.0, 0.0]
+    ammo = 30
+    position = [0.0, -1500.0]
+    global playerZ
+    playerZ = 625.0
     cheatMode = autoCam = gameOver = False
+    wavePaused = False
+    waveCleared = False
+    gameWon = False
+    currentWaveNum = 1
+    enemiesKilledThisWave = 0
 
     bullets = []
     score = 0
@@ -228,6 +243,7 @@ def resetGame():
     playerAngle = 90.0
 
     enemy_initialize()
+    spawn_pickups()
 
 
 def playerBound():
@@ -363,6 +379,8 @@ def setupCamera():
 
 def collisionCheacker():
     global health, score, missed, gameOver, bullets, enemies
+    global enemiesKilledThisWave, wavePaused, waveCleared, gameWon, currentWaveNum
+    global ammo
 
     activeBullets = []
 
@@ -386,6 +404,19 @@ def collisionCheacker():
         if hitEnemy:
             enemies.remove(hitEnemy)
             score += 1
+            enemiesKilledThisWave += 1
+
+            # Check if wave kill target reached
+            target = WAVE_KILL_TARGETS.get(currentWaveNum, 10)
+            if enemiesKilledThisWave >= target:
+                if currentWaveNum >= MAX_WAVES:
+                    gameWon = True
+                    gameOver = True
+                else:
+                    wavePaused = True
+                    waveCleared = True
+                    enemies.clear()
+                    bullets.clear()
         else:
             activeBullets.append(bullet)
 
@@ -401,36 +432,70 @@ def collisionCheacker():
             if health <= 0:
                 gameOver = True
                 return
+
+    # ---- PICKUP COLLISION ----
+    if playerZ > 300 and pickup is not None and pickup["active"]:
+        gap = math.hypot(position[0] - pickup["x"], position[1] - pickup["y"])
+        if gap < PICKUP_RADIUS:
+            pickup["active"] = False
+            if pickup["type"] == "health":
+                health = min(health + 5, 20)
+            elif pickup["type"] == "ammo":
+                ammo = min(ammo + 5, 99)
+
+
 def cheatShoot():
     global gunAngle, lastShot, frame
 
-    # Rotate gun automatically
-    gunAngle = (gunAngle + 3) % 360
-
-    # Fire only every few frames to prevent spam
-    if frame - lastShot < 20:
-        return
+    # Rotate gun automatically — faster sweep in cheat mode
+    gunAngle = (gunAngle + 20.0) % 360.0
 
     rad = math.radians(gunAngle)
+    gunDirX = math.cos(rad)
+    gunDirY = math.sin(rad)
 
-    # Spawn bullet in front of player
-    bx, by, bz = bulletSpawn(gunAngle)
+    # Fire only every few frames to prevent spam (kept from Code 1)
+    canShoot = (frame - lastShot) > 20
 
-    bullets.append({
-        "x": bx,
-        "y": by,
-        "z": bz,
-        "dx": math.cos(rad) * speedBullet,
-        "dy": math.sin(rad) * speedBullet
-    })
+    # Smart targeting from Code 2: scan enemies for alignment
+    for enemy in enemies:
+        dx = enemy["x"] - position[0]
+        dy = enemy["y"] - position[1]
+        dist = math.hypot(dx, dy)
 
-    lastShot = frame
+        if dist == 0:
+            continue
+
+        # Floor-aware check: only target enemies on the same floor as player
+        gap_z = abs(playerZ - enemy["z"])
+        if gap_z > 200:
+            continue
+
+        dirX = dx / dist
+        dirY = dy / dist
+
+        # Dot-product alignment check (from Code 2)
+        isAligned = (gunDirX * dirX + gunDirY * dirY) > 0.95
+
+        if isAligned and canShoot:
+            bx, by, bz = bulletSpawn(gunAngle)
+            bullets.append({
+                "x": bx,
+                "y": by,
+                "z": bz,
+                "dx": dirX * speedBullet,
+                "dy": dirY * speedBullet
+            })
+            lastShot = frame
+            break
+
 
 def idle():
     global frame, gunAngle, bullets, lastShot, escalatorOffset
-    global playerZ, onEscalator, spawnTimer
+    global playerZ, onEscalator, spawnTimer, playerAngle
+    global pickup, pickupTimer
 
-    if gameOver:
+    if gameOver or wavePaused:
         glutPostRedisplay()
         return
 
@@ -496,6 +561,9 @@ def idle():
 
     if cheatMode:
         cheatShoot()
+        # Sync player body rotation to gun when autoCam is active
+        if autoCam:
+            playerAngle = gunAngle
     else:
         gunAngle = playerAngle
     spawnTimer += 1
@@ -505,6 +573,13 @@ def idle():
     if spawnTimer >= currentSpawnDelay and len(enemies) < getMaxEnemiesForWave():
         createEnemy()
         spawnTimer = 0
+
+    # Timed pickup spawn on 2nd floor
+    if pickup is None or not pickup["active"]:
+        pickupTimer += 1
+        if pickupTimer >= PICKUP_INTERVAL:
+            spawn_single_pickup()
+            pickupTimer = 0
 
     collisionCheacker()
     glutPostRedisplay()
@@ -592,6 +667,49 @@ def draw_enemy(enemy):
 
     else:
         draw_normal_zombie(x, y, scale)
+
+    glPopMatrix()
+
+
+def draw_enemy_pointer(enemy):
+    """Draws a red downward-pointing arrow floating above each enemy"""
+    x = enemy["x"]
+    y = enemy["y"]
+    z = enemy["z"]
+
+    # Colour based on type: brute=red, runner=orange, normal=yellow
+    if enemy["type"] == "brute":
+        glColor3f(1.0, 0.0, 0.0)
+    elif enemy["type"] == "runner":
+        glColor3f(1.0, 0.5, 0.0)
+    else:
+        glColor3f(1.0, 1.0, 0.0)
+
+    # Bounce the pointer up and down using frame counter
+    bounce = 20.0 * math.sin(frame * 0.08 + enemy["phase"])
+    tip_z   = z + 320 + bounce        # tip of the arrow (bottom point)
+    base_z  = z + 420 + bounce        # base of the triangle (top)
+    stem_z  = z + 500 + bounce        # top of the stem
+
+    s = 28   # half-width of arrow head
+    sw = 8   # half-width of stem
+
+    glPushMatrix()
+
+    # --- Arrow head (downward triangle) ---
+    glBegin(GL_TRIANGLES)
+    glVertex3f(x - s, y, base_z)
+    glVertex3f(x + s, y, base_z)
+    glVertex3f(x,     y, tip_z)
+    glEnd()
+
+    # --- Stem above the arrow head ---
+    glBegin(GL_QUADS)
+    glVertex3f(x - sw, y, base_z)
+    glVertex3f(x + sw, y, base_z)
+    glVertex3f(x + sw, y, stem_z)
+    glVertex3f(x - sw, y, stem_z)
+    glEnd()
 
     glPopMatrix()
 
@@ -1001,10 +1119,6 @@ def draw_second_floor_railings():
     top_rail_x(y_start)
     posts_x(y_start)
 
-    # base_bar_x(y_end)
-    # top_rail_x(y_end)
-    # posts_x(y_end)
-
     base_bar_y(x_start)
     top_rail_y(x_start)
     posts_y(x_start)
@@ -1115,6 +1229,13 @@ def draw_bullet(cx, cy, cz, scale=1.0, angle=0):
     gluCylinder(quad, 4, 0, 10, 10, 4)
     glPopMatrix()
 
+    # Base — flat cap
+    glColor3f(0.60, 0.50, 0.10)
+    glPushMatrix()
+    glRotatef(-90, 0, 1, 0)
+    gluDisk(quad, 0, 4, 10, 2)
+    glPopMatrix()
+
     glPopMatrix()
 
 
@@ -1161,6 +1282,24 @@ def draw_ammo_cube(x, y, z, s=40):
     draw_bullet(x, y, z + offset, scale=1.0, angle=0)  # front — horizontal
     draw_bullet(x - s - 2, y, z, scale=1.0, angle=45)  # left  — diagonal
     draw_bullet(x, y, z - offset, scale=1.0, angle=20)  # back
+
+
+def draw_pickups():
+    """Draw the active pickup on the 2nd floor (if any)."""
+    if pickup is None or not pickup["active"]:
+        return
+    px = pickup["x"]
+    py = pickup["y"]
+    pz = PICKUP_SPAWN_Z + 40
+
+    # Gentle bob animation
+    bob = 15.0 * math.sin(frame * 0.05 + px * 0.01)
+    pz += bob
+
+    if pickup["type"] == "health":
+        draw_life_cube(px, py, pz, s=35)
+    else:
+        draw_ammo_cube(px, py, pz, s=35)
 
 
 def draw_normal_zombie(x, y, scale=1.0):
@@ -1568,6 +1707,17 @@ def useAltSkill():
     enemies = remaining
 
 
+def draw_centered_text(y, text, font=None):
+    """Draw text centered horizontally on screen."""
+    if font is None:
+        font = DEFAULT_FONT
+    # Approximate char width
+    char_w = 11
+    text_w = len(text) * char_w
+    x = (1000 - text_w) / 2
+    draw_text(x, y, text, font)
+
+
 def showScreen():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
@@ -1576,24 +1726,19 @@ def showScreen():
     setupCamera()
     drawPlayer()
     draw_floor()
-    #draw_normal_zombie(200, 700, 1.0)
-    #draw_runner_zombie(0, 700, 1.0)
-    #draw_brute_zombie(-200, 700, 1.0)
-    draw_life_cube(500, 100, 40)  # raised up on Z
-    draw_ammo_cube(-500, 100, 40)  # raised up on Z
     draw_escalators()
     draw_floor_connector_walls()
     draw_second_floor()
     draw_second_floor_railings()
-
-    # draw_grid()
-    # draw_boundaries()
+    draw_pickups()
 
     for e in enemies:
       draw_enemy(e)
+      draw_enemy_pointer(e)
 
     draw_bullets()
 
+    # ---- MANUAL SCREEN ----
     if showManual:
         draw_text(300, 600, "BULLET FRENZY")
         draw_text(250, 550, "Press ENTER to Start")
@@ -1613,31 +1758,89 @@ def showScreen():
         draw_text(200, 140, "C - Cheat Mode")
         draw_text(200, 110, "V - Auto Aim")
 
-    hud_x = 15  # left margin
-    hud_y = 770  # top position
-    gap = 25  # vertical spacing
+    # ---- HUD ----
+    hud_x = 15
+    hud_y = 770
+    gap = 25
 
     draw_text(hud_x, hud_y, f"Life: {health}")
-    draw_text(hud_x, hud_y - gap, f"Score: {score}")
-    draw_text(hud_x, hud_y - gap * 2, f"Missed: {missed}")
-    draw_text(hud_x, hud_y - gap * 3, f"Wave: {getCurrentWave()}")
+    draw_text(hud_x, hud_y - gap, f"Ammo: {ammo}")
+    draw_text(hud_x, hud_y - gap * 2, f"Score: {score}")
+    draw_text(hud_x, hud_y - gap * 3, f"Missed: {missed}")
+    draw_text(hud_x, hud_y - gap * 4, f"Wave: {getCurrentWave()}")
 
-    draw_text(hud_x, hud_y - gap * 4, "F: Blast (-5)")
+    # Wave progress
+    target = WAVE_KILL_TARGETS.get(currentWaveNum, 10)
+    draw_text(hud_x, hud_y - gap * 5, f"Kills: {enemiesKilledThisWave}/{target}")
+
+    draw_text(hud_x, hud_y - gap * 6, "F: Blast (-5)")
 
     if cheatMode:
-        draw_text(hud_x, hud_y - gap * 5, "Cheat: ON")
+        draw_text(hud_x, hud_y - gap * 7, "Cheat: ON")
 
     if autoCam and fpMode:
-        draw_text(hud_x, hud_y - gap * 6, "AutoCam: ON")
+        draw_text(hud_x, hud_y - gap * 8, "AutoCam: ON")
 
+    # Pickup hint on 2nd floor
+    if playerZ > 300:
+        if pickup is not None and pickup["active"]:
+            ptype = pickup["type"].upper()
+            draw_text(680, 30, f"2nd Floor: {ptype} pickup here!")
+        else:
+            secs_left = max(0, (PICKUP_INTERVAL - pickupTimer) // 60)
+            draw_text(680, 30, f"Next pickup in: {secs_left}s")
+
+    # ---- WAVE CLEARED / BETWEEN WAVES SCREEN ----
+    if wavePaused and not gameOver:
+        # Semi-transparent overlay feel via text
+        draw_centered_text(480, f"WAVE {currentWaveNum} CLEARED!", GLUT_BITMAP_TIMES_ROMAN_24)
+        draw_centered_text(430, f"Score: {score}   Health: {health}   Ammo: {ammo}")
+        draw_centered_text(380, "Head to the 2nd floor for health & ammo pickups!")
+        draw_centered_text(330, f"Next: Wave {currentWaveNum + 1} of {MAX_WAVES}")
+        draw_centered_text(280, "Press ENTER to continue to next wave")
+
+    # ---- GAME OVER / WIN SCREEN ----
     if gameOver:
-        draw_text(350, 400, "GAME OVER! Press R")
+        if gameWon:
+            draw_centered_text(500, "CONGRATULATIONS!", GLUT_BITMAP_TIMES_ROMAN_24)
+            draw_centered_text(450, "You survived all 3 waves!")
+            draw_centered_text(400, f"Final Score: {score}")
+            draw_centered_text(350, "Press R to play again")
+        else:
+            draw_centered_text(430, "GAME OVER!", GLUT_BITMAP_TIMES_ROMAN_24)
+            draw_centered_text(380, f"Final Score: {score}   Wave: {currentWaveNum}")
+            draw_centered_text(330, "Press R to restart")
 
     glutSwapBuffers()
 
 
+def advance_to_next_wave():
+    """Called when player presses ENTER during wave pause."""
+    global currentWaveNum, wavePaused, waveCleared, enemiesKilledThisWave
+    global spawnTimer, bullets
+
+    currentWaveNum += 1
+    wavePaused = False
+    waveCleared = False
+    enemiesKilledThisWave = 0
+    spawnTimer = 0
+    bullets = []
+
+    # Refresh pickups for the new wave
+    spawn_pickups()  # resets pickup and pickupTimer
+
+    # Spawn initial enemies for new wave
+    enemy_initialize()
+
+
 def keyboardListener(key, x, y):
     global position, playerAngle, cheatMode, autoCam, camMode, showManual
+
+    # ENTER key during wave pause advances wave
+    if wavePaused and not gameOver:
+        if key == b'\r':
+            advance_to_next_wave()
+        return
 
     if gameOver:
         if key == b'r':
@@ -1730,6 +1933,7 @@ def specialKeyListener(key, x, y):
 
     # Keep angle clean between 0 and 359 degrees
     camAngle %= 360
+
 def bulletSpawn(angle):
     rad = math.radians(angle)
 
@@ -1742,7 +1946,7 @@ def bulletSpawn(angle):
 def mouseListener(button, state, x, y):
     global fpMode
 
-    if gameOver:
+    if gameOver or wavePaused:
         return
 
     # Left mouse button fires a bullet
@@ -1780,6 +1984,7 @@ def main():
     wind = glutCreateWindow(b"Bracu Zombie Outbreak")  # Create the window
 
     enemy_initialize()
+    spawn_pickups()
 
     glutDisplayFunc(showScreen)  # Register display function
     glutKeyboardFunc(keyboardListener)  # Register keyboard listener
