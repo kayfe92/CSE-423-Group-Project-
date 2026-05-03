@@ -453,6 +453,11 @@ def idle():
     else:
         onEscalator = None
 
+    if onEscalator == 'up':
+        position[1] += 6.0
+    elif onEscalator == 'down':
+        position[1] -= 6.0
+
     #Move player Z based on escalator
     if onEscalator == 'up':
         # interpolate Z based on Y position along escalator
