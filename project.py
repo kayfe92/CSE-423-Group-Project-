@@ -1115,13 +1115,6 @@ def draw_bullet(cx, cy, cz, scale=1.0, angle=0):
     gluCylinder(quad, 4, 0, 10, 10, 4)
     glPopMatrix()
 
-    # Base — flat cap
-    glColor3f(0.60, 0.50, 0.10)
-    glPushMatrix()
-    glRotatef(-90, 0, 1, 0)
-    gluDisk(quad, 0, 4, 10, 2)
-    glPopMatrix()
-
     glPopMatrix()
 
 
