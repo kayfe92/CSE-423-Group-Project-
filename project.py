@@ -30,7 +30,7 @@ WORLD_LIMIT = 2000
 GRID_LENGTH = 600
 TILE_SIZE = 100
 
-PLAYER_SCALE = 1.0
+PLAYER_SCALE = 0.8
 
 enemies = []
 bullets = []
@@ -42,7 +42,7 @@ spawnDelay = 180
 ALT_COST = 5
 ALT_RADIUS = 350
 
-speedBullet = 35.0
+speedBullet = 120.0
 
 gunFwd = 265.0 * PLAYER_SCALE
 gunH = 180.0 * PLAYER_SCALE
@@ -389,9 +389,10 @@ def collisionCheacker():
         y_out = abs(bullet["y"]) > WORLD_LIMIT
 
         if (x_out or y_out):
-            missed += 1
-            if missed >= 5:
-                gameOver = True
+            if not cheatMode:
+                missed += 1
+                if missed >= 5:
+                    gameOver = True
             continue
 
         hitEnemy = None
@@ -445,39 +446,47 @@ def collisionCheacker():
 
 
 def cheatShoot():
+    """
+    Cheat mode: slowly sweeps gunAngle, finds the nearest aligned enemy,
+    aims directly at it and fires. Ammo is NOT consumed in cheat mode.
+    """
     global gunAngle, lastShot, frame
 
-    # Rotate gun automatically — faster sweep in cheat mode
-    gunAngle = (gunAngle + 20.0) % 360.0
-
-    rad = math.radians(gunAngle)
-    gunDirX = math.cos(rad)
-    gunDirY = math.sin(rad)
-
-    # Fire only every few frames to prevent spam (kept from Code 1)
+    # Smoothly rotate gun angle toward nearest enemy, or sweep if none found
     canShoot = (frame - lastShot) > 20
 
-    # Smart targeting from Code 2: scan enemies for alignment
+    # Find the closest enemy on the same floor
+    best_enemy = None
+    best_dist = float('inf')
     for enemy in enemies:
-        dx = enemy["x"] - position[0]
-        dy = enemy["y"] - position[1]
-        dist = math.hypot(dx, dy)
-
-        if dist == 0:
-            continue
-
-        # Floor-aware check: only target enemies on the same floor as player
         gap_z = abs(playerZ - enemy["z"])
         if gap_z > 200:
             continue
+        dist = math.hypot(enemy["x"] - position[0], enemy["y"] - position[1])
+        if dist < best_dist:
+            best_dist = dist
+            best_enemy = enemy
 
-        dirX = dx / dist
-        dirY = dy / dist
+    if best_enemy is not None:
+        # Aim directly at the nearest enemy
+        dx = best_enemy["x"] - position[0]
+        dy = best_enemy["y"] - position[1]
+        target_angle = math.degrees(math.atan2(dy, dx))
 
-        # Dot-product alignment check (from Code 2)
-        isAligned = (gunDirX * dirX + gunDirY * dirY) > 0.95
+        # Smoothly rotate gunAngle toward target_angle
+        diff = (target_angle - gunAngle + 180) % 360 - 180
+        rotate_speed = 8.0
+        if abs(diff) < rotate_speed:
+            gunAngle = target_angle
+        else:
+            gunAngle += rotate_speed if diff > 0 else -rotate_speed
+        gunAngle %= 360
 
-        if isAligned and canShoot:
+        # Fire when closely aligned
+        if abs(diff) < 5.0 and canShoot:
+            dist = math.hypot(dx, dy)
+            dirX = dx / dist
+            dirY = dy / dist
             bx, by, bz = bulletSpawn(gunAngle)
             bullets.append({
                 "x": bx,
@@ -487,7 +496,9 @@ def cheatShoot():
                 "dy": dirY * speedBullet
             })
             lastShot = frame
-            break
+    else:
+        # No enemy visible — sweep continuously
+        gunAngle = (gunAngle + 4.0) % 360.0
 
 
 def idle():
@@ -565,7 +576,33 @@ def idle():
         if autoCam:
             playerAngle = gunAngle
     else:
-        gunAngle = playerAngle
+        if autoCam:
+            # V pressed without cheat mode: rotate player toward nearest enemy
+            best_enemy = None
+            best_dist = float('inf')
+            for enemy in enemies:
+                gap_z = abs(playerZ - enemy["z"])
+                if gap_z > 200:
+                    continue
+                dist = math.hypot(enemy["x"] - position[0], enemy["y"] - position[1])
+                if dist < best_dist:
+                    best_dist = dist
+                    best_enemy = enemy
+            if best_enemy is not None:
+                dx = best_enemy["x"] - position[0]
+                dy = best_enemy["y"] - position[1]
+                target_angle = math.degrees(math.atan2(dy, dx))
+                diff = (target_angle - playerAngle + 180) % 360 - 180
+                rotate_speed = 6.0
+                if abs(diff) < rotate_speed:
+                    playerAngle = target_angle
+                else:
+                    playerAngle += rotate_speed if diff > 0 else -rotate_speed
+                playerAngle %= 360
+            gunAngle = playerAngle
+        else:
+            gunAngle = playerAngle
+
     spawnTimer += 1
 
     currentSpawnDelay = max(60, spawnDelay - score * 3)
@@ -667,49 +704,6 @@ def draw_enemy(enemy):
 
     else:
         draw_normal_zombie(x, y, scale)
-
-    glPopMatrix()
-
-
-def draw_enemy_pointer(enemy):
-    """Draws a red downward-pointing arrow floating above each enemy"""
-    x = enemy["x"]
-    y = enemy["y"]
-    z = enemy["z"]
-
-    # Colour based on type: brute=red, runner=orange, normal=yellow
-    if enemy["type"] == "brute":
-        glColor3f(1.0, 0.0, 0.0)
-    elif enemy["type"] == "runner":
-        glColor3f(1.0, 0.5, 0.0)
-    else:
-        glColor3f(1.0, 1.0, 0.0)
-
-    # Bounce the pointer up and down using frame counter
-    bounce = 20.0 * math.sin(frame * 0.08 + enemy["phase"])
-    tip_z   = z + 320 + bounce        # tip of the arrow (bottom point)
-    base_z  = z + 420 + bounce        # base of the triangle (top)
-    stem_z  = z + 500 + bounce        # top of the stem
-
-    s = 28   # half-width of arrow head
-    sw = 8   # half-width of stem
-
-    glPushMatrix()
-
-    # --- Arrow head (downward triangle) ---
-    glBegin(GL_TRIANGLES)
-    glVertex3f(x - s, y, base_z)
-    glVertex3f(x + s, y, base_z)
-    glVertex3f(x,     y, tip_z)
-    glEnd()
-
-    # --- Stem above the arrow head ---
-    glBegin(GL_QUADS)
-    glVertex3f(x - sw, y, base_z)
-    glVertex3f(x + sw, y, base_z)
-    glVertex3f(x + sw, y, stem_z)
-    glVertex3f(x - sw, y, stem_z)
-    glEnd()
 
     glPopMatrix()
 
@@ -1557,9 +1551,10 @@ def drawPlayer():
     glPushMatrix()
 
     glTranslatef(position[0], position[1], playerZ)  # use actual position
-    glRotatef(playerAngle - 90, 0, 0, 1)  # face movement direction
+    glRotatef(playerAngle - 90, 0, 0, 1)             # face movement direction
     glRotatef(90, 1, 0, 0)
-    glScalef(1.8, 1.8, 1.8)
+    # ---- PLAYER SIZE REDUCED: was 1.8, now 1.2 ----
+    glScalef(1.2, 1.2, 1.2)
 
     # --- head ---
     glColor3f(0.90, 0.72, 0.55)
@@ -1717,12 +1712,35 @@ def draw_centered_text(y, text, font=None):
     x = (1000 - text_w) / 2
     draw_text(x, y, text, font)
 
+def draw_sky():
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, 1, 0, 1)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    glDisable(GL_DEPTH_TEST)
+    glColor3f(0.53, 0.81, 0.98)  # sky blue
+    glBegin(GL_QUADS)
+    glVertex2f(0, 0)
+    glVertex2f(1, 0)
+    glVertex2f(1, 1)
+    glVertex2f(0, 1)
+    glEnd()
+    glEnable(GL_DEPTH_TEST)
+
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
 
 def showScreen():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
     glViewport(0, 0, 1000, 800)
-
+    draw_sky()
     setupCamera()
     drawPlayer()
     draw_floor()
@@ -1733,8 +1751,8 @@ def showScreen():
     draw_pickups()
 
     for e in enemies:
-      draw_enemy(e)
-      draw_enemy_pointer(e)
+        draw_enemy(e)
+        # draw_enemy_pointer removed — arrows above enemies disabled
 
     draw_bullets()
 
@@ -1944,13 +1962,16 @@ def bulletSpawn(angle):
     return bx, by, bz
 
 def mouseListener(button, state, x, y):
-    global fpMode
+    global fpMode, ammo
 
     if gameOver or wavePaused:
         return
 
     # Left mouse button fires a bullet
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        if ammo <= 0:
+            return  # no ammo, cannot fire
+
         if cheatMode:
             shoot_angle = gunAngle
         else:
@@ -1965,6 +1986,7 @@ def mouseListener(button, state, x, y):
             "dx": math.cos(rad) * speedBullet,
             "dy": math.sin(rad) * speedBullet
         })
+        ammo -= 1  # consume one ammo per shot
 
     # Right mouse button toggles camera tracking mode
     if button == GLUT_RIGHT_BUTTON and state == GLUT_DOWN:
@@ -1992,6 +2014,7 @@ def main():
     glutMouseFunc(mouseListener)
     glutIdleFunc(idle)
     glEnable(GL_DEPTH_TEST)
+
     glutMainLoop()  # Enter the GLUT main loop
 
 
