@@ -79,7 +79,7 @@ WAVE_KILL_TARGETS = {1: 10, 2: 20, 3: 30}
 pickup = None
 PICKUP_SPAWN_Z = 625    # 2nd floor height
 PICKUP_RADIUS = 80      # collection radius
-PICKUP_INTERVAL = 180   # frames between spawns (~5 sec at 60fps)
+PICKUP_INTERVAL = 3   # frames between spawns (~5 sec at 60fps)
 pickupTimer = 0         # counts up; spawn when it hits PICKUP_INTERVAL
 
 def spawn_single_pickup():
@@ -391,14 +391,20 @@ def collisionCheacker():
         if (x_out or y_out):
             if not cheatMode:
                 missed += 1
-                if missed >= 5:
+                if missed >= 12:
                     gameOver = True
             continue
 
         hitEnemy = None
         for enemy in enemies:
+            if enemy["type"] == "brute":
+                hit_radius = 90
+            elif enemy["type"] == "runner":
+                hit_radius = 55
+            else:
+                hit_radius = 40
             gap = math.hypot(bullet["x"] - enemy["x"], bullet["y"] - enemy["y"])
-            if gap < 40:
+            if gap < hit_radius:
                 hitEnemy = enemy
                 break
 
@@ -1223,11 +1229,12 @@ def draw_bullet(cx, cy, cz, scale=1.0, angle=0):
     gluCylinder(quad, 4, 0, 10, 10, 4)
     glPopMatrix()
 
-    # Base — flat cap
+    # Base — flat cap (cube instead of gluDisk)
     glColor3f(0.60, 0.50, 0.10)
     glPushMatrix()
-    glRotatef(-90, 0, 1, 0)
-    gluDisk(quad, 0, 4, 10, 2)
+    glTranslatef(-2, 0, 0)      # move slightly back to align with cylinder
+    glScalef(1, 4, 4)           # flatten cube into a disk-like shape
+    glutSolidCube(2)
     glPopMatrix()
 
     glPopMatrix()
@@ -1758,14 +1765,14 @@ def showScreen():
 
     # ---- MANUAL SCREEN ----
     if showManual:
-        draw_text(300, 600, "BULLET FRENZY")
+        draw_text(200, 600, "BRACU Escalator Zombie Outbreak")
         draw_text(250, 550, "Press ENTER to Start")
 
         draw_text(200, 480, "Controls:")
         draw_text(200, 450, "W/S - Move Forward/Backward")
         draw_text(200, 420, "A/D - Rotate Player")
         draw_text(200, 390, "Mouse Left - Shoot")
-        draw_text(200, 360, "Mouse Right - Toggle FPS")
+        
 
         draw_text(200, 310, "Camera Modes:")
         draw_text(200, 280, "1 - First Floor View")
@@ -1791,7 +1798,7 @@ def showScreen():
     target = WAVE_KILL_TARGETS.get(currentWaveNum, 10)
     draw_text(hud_x, hud_y - gap * 5, f"Kills: {enemiesKilledThisWave}/{target}")
 
-    draw_text(hud_x, hud_y - gap * 6, "F: Blast (-5)")
+    
 
     if cheatMode:
         draw_text(hud_x, hud_y - gap * 7, "Cheat: ON")
@@ -1900,10 +1907,6 @@ def keyboardListener(key, x, y):
     if key == b'v':
         autoCam = not autoCam
 
-    #Alt skill activate
-    if key == b'f':
-        useAltSkill()
-
     # ---- CAMERA MODES ----
     if key == b'1':
         camMode = 1
@@ -1923,7 +1926,7 @@ def keyboardListener(key, x, y):
 
 
 def specialKeyListener(key, x, y):
-    global camHeight, camAngle, camForward
+    global camHeight, camAngle, camForward, camMode
 
     # ---- UP / DOWN ----
     if key == GLUT_KEY_UP:
