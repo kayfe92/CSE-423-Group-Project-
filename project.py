@@ -8,8 +8,8 @@ playerZ = 0.0
 position = [0.0, 0.0]
 # player's height
 onEscalator = None  # None, 'up', or 'down'
-ESCALATOR_BOTTOM_Y = 1650  # where escalator starts (world space after transform)
-ESCALATOR_TOP_Y = 1050  # where escalator ends
+ESCALATOR_BOTTOM_Y = 350  # where escalator starts (world space after transform)
+ESCALATOR_TOP_Y = -1050  # where escalator ends
 ESCALATOR_BOTTOM_Z = 0
 ESCALATOR_TOP_Z = 625
 ESCALATOR_RIGHT_X = 130  # right lane x (goes up)
@@ -233,24 +233,39 @@ def resetGame():
 def playerBound():
     margin = 50.0
 
+    # Escalator zone detection
+    in_esc_y = ESCALATOR_TOP_Y <= position[1] <= ESCALATOR_BOTTOM_Y
+    near_right = abs(position[0] - ESCALATOR_RIGHT_X) < ESCALATOR_LANE_W
+    near_left  = abs(position[0] - ESCALATOR_LEFT_X)  < ESCALATOR_LANE_W
+    on_escalator = in_esc_y and (near_right or near_left)
+
+    if on_escalator:
+        # Lock player inside their escalator lane
+        cx = ESCALATOR_RIGHT_X if near_right else ESCALATOR_LEFT_X
+        if position[0] < cx - ESCALATOR_LANE_W + margin:
+            position[0] = cx - ESCALATOR_LANE_W + margin
+        elif position[0] > cx + ESCALATOR_LANE_W - margin:
+            position[0] = cx + ESCALATOR_LANE_W - margin
+        if position[1] < ESCALATOR_TOP_Y:
+            position[1] = ESCALATOR_TOP_Y
+        elif position[1] > ESCALATOR_BOTTOM_Y:
+            position[1] = ESCALATOR_BOTTOM_Y
+        return  # skip floor bounds while on escalator
+
     if playerZ > 300:
         # 2nd floor bounds
         x_limit = 2000
         y_min = -3000 + margin
+        y_max = -1000 - margin   # -1050, aligns with escalator top
 
-        # no boundary in the middle opening (escalator gap)
-        in_escalator_gap = abs(position[0]) < 200
-
-        if not in_escalator_gap:
-            if position[0] < -x_limit + margin:
-                position[0] = -x_limit + margin
-            elif position[0] > x_limit - margin:
-                position[0] = x_limit - margin
-
-        # only block the front, back is open
+        if position[0] < -x_limit + margin:
+            position[0] = -x_limit + margin
+        elif position[0] > x_limit - margin:
+            position[0] = x_limit - margin
         if position[1] < y_min:
             position[1] = y_min
-
+        elif position[1] > y_max:
+            position[1] = y_max
     else:
         # 1st floor bounds
         x_limit = 2000
@@ -260,7 +275,6 @@ def playerBound():
             position[0] = -x_limit + margin
         elif position[0] > x_limit - margin:
             position[0] = x_limit - margin
-
         if position[1] < -y_limit + margin:
             position[1] = -y_limit + margin
         elif position[1] > y_limit - margin:
@@ -449,7 +463,7 @@ def idle():
     elif onEscalator == 'down':
         t = (ESCALATOR_BOTTOM_Y - py) / (ESCALATOR_BOTTOM_Y - ESCALATOR_TOP_Y)
         t = max(0.0, min(1.0, t))
-        playerZ = ESCALATOR_TOP_Z - t * (ESCALATOR_TOP_Z - ESCALATOR_BOTTOM_Z)
+        playerZ = ESCALATOR_BOTTOM_Z + t * (ESCALATOR_TOP_Z - ESCALATOR_BOTTOM_Z)
 
     else:
         # snap to correct floor based on Z
