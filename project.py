@@ -30,7 +30,7 @@ WORLD_LIMIT = 2000
 GRID_LENGTH = 600
 TILE_SIZE = 100
 
-PLAYER_SCALE = 0.45
+PLAYER_SCALE = 1.0
 
 enemies = []
 bullets = []
@@ -1559,7 +1559,7 @@ def drawPlayer():
     glTranslatef(position[0], position[1], playerZ)  # use actual position
     glRotatef(playerAngle - 90, 0, 0, 1)  # face movement direction
     glRotatef(90, 1, 0, 0)
-    glScalef(0.8, 0.8, 0.8)
+    glScalef(1.8, 1.8, 1.8)
 
     # --- head ---
     glColor3f(0.90, 0.72, 0.55)
